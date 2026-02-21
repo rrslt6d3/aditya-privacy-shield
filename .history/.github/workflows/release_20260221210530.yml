@@ -1,0 +1,42 @@
+name: "Cloud Factory: Build App"
+
+on:
+  push:
+    tags:
+      - "v*" # This tells the factory to ONLY run when you release a new version
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write # Grants the factory permission to hand you the final .exe file
+
+    steps:
+      - name: 1. Checkout Your Code
+        uses: actions/checkout@v4
+
+      - name: 2. Install Node.js (Frontend Engine)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 3. Install Rust (Backend Engine with Snapdragon Support)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc, x86_64-pc-windows-msvc
+
+      - name: 4. Install App Dependencies
+        run: npm install
+
+      - name: 5. Compile and Package the Native .exe
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: app-v__VERSION__
+          releaseName: "Aditya Privacy Shield Pro v__VERSION__"
+          releaseBody: "Automated secure release. Download the .exe below to install."
+          releaseDraft: false
+          prerelease: false
+          # This specific flag guarantees it runs at maximum speed on your ARM64 laptop
+          args: --target aarch64-pc-windows-msvc
