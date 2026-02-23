@@ -1,6 +1,6 @@
 {
   "productName": "Aditya Privacy Shield Pro",
-  "version": "1.0.27",
+  "version": "1.0.25",
   "identifier": "com.aditya.privacy.shield",
   "build": {
     "beforeDevCommand": "npm run dev",
