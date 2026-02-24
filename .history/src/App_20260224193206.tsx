@@ -29,7 +29,7 @@ const SUPABASE_URL = "https://qppnrcnkngzjkbpjdxyz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_tXOzLkrHDOZJKE3rLzhUXQ_-wUXnhAA";
 // --------------------------------------------------
 
-// THE UPGRADED LIVE GATEKEEPER SCREEN
+// THE LIVE GATEKEEPER SCREEN
 function LicenseScreen({ onUnlock }: { onUnlock: () => void }) {
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
@@ -41,6 +41,7 @@ function LicenseScreen({ onUnlock }: { onUnlock: () => void }) {
     setError("");
 
     try {
+      // Ping the Supabase Cloud Vault
       const response = await fetch(`${SUPABASE_URL}/rest/v1/license_keys?key_string=eq.${key}&select=*`, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
@@ -52,10 +53,13 @@ function LicenseScreen({ onUnlock }: { onUnlock: () => void }) {
 
       const data = await response.json();
 
+      // Check if the key exists in the vault
       if (data && data.length > 0) {
         const license = data[0];
+        
+        // Check if the key is still active
         if (license.is_active) {
-          onUnlock(); 
+          onUnlock(); // The Vault Opens!
         } else {
           setError("This license key has been deactivated. Contact support.");
         }
@@ -71,34 +75,49 @@ function LicenseScreen({ onUnlock }: { onUnlock: () => void }) {
 
   return (
     <div className="enterprise-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
-      <div className="metric-card" style={{ width: '480px', padding: '3.5rem 3rem', textAlign: 'center' }}>
-        
-        {/* Title now uses CSS classes to guarantee the gradient shows up */}
-        <h1 className="gatekeeper-title">Shield Pro</h1>
-        <p className="gatekeeper-subtitle">Enterprise License Verification</p>
+      <div className="metric-card" style={{ width: '450px', padding: '3rem', textAlign: 'center' }}>
+        <h1 style={{ 
+          background: 'var(--brand-gradient)', 
+          WebkitBackgroundClip: 'text', 
+          WebkitTextFillColor: 'transparent',
+          fontSize: '2.5rem',
+          marginBottom: '0.5rem'
+        }}>Shield Pro</h1>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '2.5rem', fontSize: '0.9rem' }}>
+          Enterprise License Verification
+        </p>
 
-        {/* The new highly visible input box */}
         <input 
           type="text" 
-          className="license-input"
-          placeholder="Paste your License Key here..." 
+          placeholder="Enter your License Key..." 
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          spellCheck="false"
+          style={{
+            width: '100%',
+            padding: '1.2rem',
+            background: 'var(--panel-glass)',
+            border: `1px solid ${error ? 'red' : 'var(--border-glass)'}`,
+            color: 'white',
+            borderRadius: '12px',
+            fontSize: '1.1rem',
+            textAlign: 'center',
+            marginBottom: '1rem',
+            boxSizing: 'border-box'
+          }}
         />
 
-        {error && <div className="error-text">{error}</div>}
+        {error && <div style={{ color: '#ff4444', fontSize: '0.85rem', marginBottom: '1rem' }}>{error}</div>}
 
         <button 
           className="glow-button" 
           onClick={handleVerify}
           disabled={isVerifying || !key.trim()}
-          style={{ marginBottom: '1.5rem', marginTop: '1rem' }}
+          style={{ marginBottom: '1rem' }}
         >
           {isVerifying ? "Verifying Matrix..." : "Authenticate"}
         </button>
 
-        <a href="https://adityalabs.ai" target="_blank" className="purchase-link">
+        <a href="#" style={{ color: 'var(--neon-blue)', fontSize: '0.85rem', textDecoration: 'none' }}>
           Purchase a license at adityalabs.ai
         </a>
       </div>
