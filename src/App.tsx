@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { jsPDF } from "jspdf";
+import { createClient } from "@supabase/supabase-js"; // <-- THE NEW TOOL!
 import "./App.css";
 
 class ErrorBoundary extends React.Component<any, { hasError: boolean }> {
@@ -24,9 +25,10 @@ class ErrorBoundary extends React.Component<any, { hasError: boolean }> {
   }
 }
 
-// --- 🛑 PASTE YOUR SUPABASE CREDENTIALS HERE 🛑 ---
+// --- 🛑 YOUR DATABASE MAP 🛑 ---
 const SUPABASE_URL = "https://qppnrcnkngzjkbpjdxyz.supabase.co"; 
 const SUPABASE_ANON_KEY = "sb_publishable_tXOzLkrHDOZJKE3rLzhUXQ_-wUXnhAA";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // --------------------------------------------------
 
 // THE LIVE GATEKEEPER SCREEN
@@ -35,31 +37,28 @@ function LicenseScreen({ onUnlock }: { onUnlock: () => void }) {
   const [error, setError] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
 
-  const handleVerify = async () => {
-    if (!key.trim()) return;
+  const handleVerify = async (keyToCheck: string) => {
+    if (!keyToCheck.trim()) return;
     setIsVerifying(true);
     setError("");
 
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/license_keys?key_string=eq.${key}&select=*`, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-        }
-      });
+      // 1. Send the Supabase robot to check the database
+      const { data, error: dbError } = await supabase
+        .from('license_keys')
+        .select('*')
+        .eq('key_string', keyToCheck.trim())
+        .single(); // Ask for exactly one matching record
 
-      if (!response.ok) throw new Error("Network error");
-      const data = await response.json();
-
-      if (data && data.length > 0) {
-        const license = data[0];
-        if (license.is_active) {
-          onUnlock(); 
-        } else {
-          setError("This license key has been deactivated. Contact support.");
-        }
-      } else {
+      if (dbError || !data) {
         setError("Invalid license key. Please check your purchase email.");
+        localStorage.removeItem("shield_pro_saved_key"); // Erase fake keys from the notebook
+      } else if (data.is_active) {
+        // 2. Write the good key in the Notebook!
+        localStorage.setItem("shield_pro_saved_key", keyToCheck.trim());
+        onUnlock(); 
+      } else {
+        setError("This license key has been deactivated. Contact support.");
       }
     } catch (err) {
       setError("Failed to connect to the licensing server. Check your internet.");
@@ -72,12 +71,8 @@ function LicenseScreen({ onUnlock }: { onUnlock: () => void }) {
     <div className="enterprise-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
       <div className="metric-card" style={{ width: '480px', padding: '3.5rem 3rem', textAlign: 'center' }}>
         
-        {/* --- THE HEADLINES ARE BACK --- */}
-        {/* .gatekeeper-title already has the gradient defined in App.css */}
         <h1 className="gatekeeper-title">Shield Pro</h1>
-        {/* .text-gradient adds the gradient to the subtitle too */}
         <p className="gatekeeper-subtitle text-gradient">Enterprise License Verification</p>
-        {/* ------------------------------ */}
 
         <input 
           type="text" 
@@ -92,7 +87,7 @@ function LicenseScreen({ onUnlock }: { onUnlock: () => void }) {
 
         <button 
           className="hollow-glow-button" 
-          onClick={handleVerify}
+          onClick={() => handleVerify(key)}
           disabled={isVerifying || !key.trim()}
           style={{ marginBottom: '1.5rem', marginTop: '1rem' }}
         >
@@ -109,7 +104,7 @@ function LicenseScreen({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
-// YOUR EXISTING APP CONTENT
+// YOUR EXISTING APP CONTENT (Unchanged)
 function AppContent() {
   const [text, setText] = useState("");
   const [secureText, setSecureText] = useState("");
@@ -282,9 +277,35 @@ function AppContent() {
   );
 }
 
-// THE MAIN ROUTER
+// THE MAIN ROUTER WITH AUTO-LOGIN MEMORY
 export default function App() {
   const [isLicensed, setIsLicensed] = useState(false);
+  const [isCheckingMemory, setIsCheckingMemory] = useState(true);
+
+  useEffect(() => {
+    // 1. App starts up. Check the Bouncer's Notebook immediately!
+    const savedKey = localStorage.getItem("shield_pro_saved_key");
+    
+    if (savedKey) {
+      // 2. We found a key! Secretly ask Supabase if it's still valid
+      supabase.from('license_keys').select('*').eq('key_string', savedKey).single()
+        .then(({ data, error }) => {
+          if (data && data.is_active) {
+            setIsLicensed(true); // Wave them right in!
+          } else {
+            localStorage.removeItem("shield_pro_saved_key"); // Key expired, erase it
+          }
+          setIsCheckingMemory(false); // Stop loading screen
+        });
+    } else {
+      setIsCheckingMemory(false); // No key found, show login screen
+    }
+  }, []);
+
+  // Show a blank dark screen for a split second while we check the notebook
+  if (isCheckingMemory) {
+    return <div className="enterprise-layout" style={{ background: '#0f172a' }}></div>;
+  }
 
   return (
     <ErrorBoundary>
